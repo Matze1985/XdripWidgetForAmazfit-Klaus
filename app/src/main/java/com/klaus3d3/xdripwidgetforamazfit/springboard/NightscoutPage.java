@@ -7,13 +7,12 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.text.format.DateFormat;
-
 import com.klaus3d3.xdripwidgetforamazfit.Constants;
 import com.klaus3d3.xdripwidgetforamazfit.R;
 import com.klaus3d3.xdripwidgetforamazfit.R2;
@@ -21,14 +20,8 @@ import com.klaus3d3.xdripwidgetforamazfit.events.NightscoutDataEvent;
 import com.klaus3d3.xdripwidgetforamazfit.events.NightscoutRequestSyncEvent;
 import com.github.marlonlom.utilities.timeago.TimeAgo;
 import com.mikepenz.iconics.Iconics;
-import android.text.style.StrikethroughSpan;
-
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
-
-
-import java.util.Date;
-
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import butterknife.OnClick;
@@ -36,9 +29,14 @@ import clc.sliteplugin.flowboard.AbstractPlugin;
 import clc.sliteplugin.flowboard.ISpringBoardHostStub;
 import xiaofei.library.hermeseventbus.HermesEventBus;
 
+import static android.content.Context.VIBRATOR_SERVICE;
+import static com.klaus3d3.xdripwidgetforamazfit.R2.id.nightscout_delta_text_view;
+import static com.klaus3d3.xdripwidgetforamazfit.R2.id.nightscout_sgv_textview;
+
 /**
  * Created by edoardotassinari on 09/04/18.
  * modded by klaus3d3 for xdrip
+ * modded by matze1985 for toast message when onResume() is called and with little vibration of red glucose values
  */
 
 public class NightscoutPage extends AbstractPlugin {
@@ -50,8 +48,8 @@ public class NightscoutPage extends AbstractPlugin {
 
     private boolean eventBusConnected;
     private Long lastDate;
+    private Vibrator vibrator;
 
-    private String trendArrow;
     private String lastSgv;
     private String lastDelta;
     private Boolean lastishigh;
@@ -65,13 +63,11 @@ public class NightscoutPage extends AbstractPlugin {
 
 
 
-
-
-    @BindView(R2.id.nightscout_sgv_textview)
+    @BindView(nightscout_sgv_textview)
     TextView sgv;
     @BindView(R2.id.nightscout_date_textview)
     TextView date;
-    @BindView(R2.id.nightscout_delta_text_view)
+    @BindView(nightscout_delta_text_view)
     TextView delta;
 
    // @BindView(R2.id.nightscout_direction_textview)
@@ -113,20 +109,19 @@ public class NightscoutPage extends AbstractPlugin {
 
         lastDate = nightscoutDataEvent.getDate();
 
-        lastfrom_plugin=nightscoutDataEvent.getFrom_plugin();
+        lastfrom_plugin = nightscoutDataEvent.getFrom_plugin();
 
-        last_plugin_name=nightscoutDataEvent.getPlugin_name();
+        last_plugin_name = nightscoutDataEvent.getPlugin_name();
         if (lastfrom_plugin) lastSgv =  plugin_symbol + String.valueOf(nightscoutDataEvent.getSgv());
         else lastSgv = String.valueOf(nightscoutDataEvent.getSgv());
 
         lastDelta = nightscoutDataEvent.getDelta();
         lastishigh = nightscoutDataEvent.getIshigh();
         lastislow = nightscoutDataEvent.getIslow();
-        lastisstale= nightscoutDataEvent.getIsstale();
+        lastisstale = nightscoutDataEvent.getIsstale();
 
-
-        lastExtra_string=nightscoutDataEvent.getExtrastring();
-        last_warning=nightscoutDataEvent.getWarning();
+        lastExtra_string = nightscoutDataEvent.getExtrastring();
+        last_warning = nightscoutDataEvent.getWarning();
 
             sgv.setText(lastSgv);
             delta.setText(lastDelta);
@@ -134,16 +129,19 @@ public class NightscoutPage extends AbstractPlugin {
             if (date != null) {
                 date.setText(TimeAgo.using(lastDate));
             }
-            if (lastislow || lastishigh || lastisstale){sgv.setTextColor(Color.RED);}else{sgv.setTextColor(Color.WHITE);}
+            if (lastislow || lastishigh || lastisstale){sgv.setTextColor(Color.RED);
+                // Alarm with little vibration
+                vibrator = (Vibrator)mContext.getSystemService(VIBRATOR_SERVICE);
+                vibrator.vibrate(150);
+            } else {
+                sgv.setTextColor(Color.WHITE);
+            }
             if (lastisstale){
-                sgv.setPaintFlags(sgv.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);}
-                else{
+                sgv.setPaintFlags(sgv.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            } else {
                 sgv.setPaintFlags(sgv.getPaintFlags()  & (~ Paint.STRIKE_THRU_TEXT_FLAG));
             }
-
     }
-
-
 
     //Return the icon for this page, used when the page is disabled in the app list. In this case, the launcher icon is used
     @Override
@@ -248,6 +246,7 @@ public class NightscoutPage extends AbstractPlugin {
         super.onResume();
         //Check if view already loaded
         if ((!this.mHasActive) && (this.mView != null)) {
+            Toast.makeText(mContext, lastSgv + "\n" + TimeAgo.using(lastDate), Toast.LENGTH_LONG).show(); // Showing toast for glucose
             //It is, simply refresh
             this.mHasActive = true;
             refreshView();
@@ -288,4 +287,5 @@ public class NightscoutPage extends AbstractPlugin {
 
         Iconics.init(context);
     }
+
 }
